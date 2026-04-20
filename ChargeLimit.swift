@@ -27,8 +27,8 @@ struct ContentView: View {
                     .foregroundStyle(.white)
                 Spacer()
             }
-            .padding(.leading, 20)
-            .padding(.vertical, 2)
+            .padding(.leading, 14)
+            .padding(.bottom, 2)
             
             Divider()
             
