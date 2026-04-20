@@ -15,19 +15,14 @@ struct ContentView: View {
     @State private var bclmPath: String = ""
     @State private var errorMessage: String? = nil
     @State private var launchAtStartup = SMAppService.mainApp.status == .enabled
+    @AppStorage("isFirstLaunch") private var isFirstLaunch = true
     
     let levels = [80, 85, 90, 95, 100]
     
     var body: some View {
         VStack {
-            HStack {
-                Spacer()
-                Text("Limit Battery Charge")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
-                Spacer()
-            }
-            .padding(.vertical, 4)
+            Text("Limit Battery Charge")
+                .font(.headline)
             
             Divider()
             
@@ -64,6 +59,13 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            if isFirstLaunch {
+                isFirstLaunch = false
+                if !launchAtStartup {
+                    try? SMAppService.mainApp.register()
+                    launchAtStartup = true
+                }
+            }
             findBclm()
             fetchLimit()
         }
