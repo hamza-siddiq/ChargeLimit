@@ -41,4 +41,26 @@ EOF
 # Compile the Swift code
 swiftc -parse-as-library ChargeLimit.swift -o ChargeLimit.app/Contents/MacOS/ChargeLimit
 
+# Copy the app icon
+if [ -f "AppIcon.icns" ]; then
+    cp AppIcon.icns ChargeLimit.app/Contents/Resources/AppIcon.icns
+fi
+
 echo "Build complete! You can run the app with: open ChargeLimit.app"
+
+echo "Building DMG..."
+rm -f ChargeLimit.dmg
+mkdir -p dmg_staging
+cp -r ChargeLimit.app dmg_staging/
+ln -s /Applications dmg_staging/Applications
+
+# Set DMG volume icon
+if [ -f "AppIcon.icns" ]; then
+    cp AppIcon.icns dmg_staging/.VolumeIcon.icns
+    SetFile -c icnC dmg_staging/.VolumeIcon.icns
+    SetFile -a C dmg_staging
+fi
+
+hdiutil create -volname ChargeLimit -srcfolder dmg_staging -ov -format UDZO ChargeLimit.dmg
+rm -rf dmg_staging
+echo "DMG created successfully."
