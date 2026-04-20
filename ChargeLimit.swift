@@ -21,8 +21,11 @@ struct ContentView: View {
     
     var body: some View {
         VStack {
-            Text("Limit Battery Charge")
-                .font(.headline)
+            Button(action: {}) {
+                Text("Limit Battery Charge")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
             
             Divider()
             
