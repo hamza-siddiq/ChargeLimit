@@ -20,9 +20,14 @@ struct ContentView: View {
     
     var body: some View {
         VStack {
-            Text("Limit Battery Charge")
-                .font(.headline)
-                .foregroundStyle(.white)
+            HStack {
+                Spacer()
+                Text("Limit Battery Charge")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+                Spacer()
+            }
+            .padding(.vertical, 4)
             
             Divider()
             
