@@ -29,14 +29,10 @@ struct ContentView: View {
                 Text("Error: bclm not found")
             } else {
                 ForEach(levels, id: \.self) { level in
-                    Button(action: { setLimit(level) }) {
-                        HStack {
-                            Text("\(level)%")
-                            if limit == level {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
+                    Toggle("\(level)%", isOn: Binding(
+                        get: { self.limit == level },
+                        set: { _ in setLimit(level) }
+                    ))
                 }
                 
                 if let error = errorMessage {
@@ -47,14 +43,13 @@ struct ContentView: View {
             
             Divider()
             
-            Button(action: toggleLaunchAtStartup) {
-                HStack {
-                    Text("Launch at Startup")
-                    if launchAtStartup {
-                        Image(systemName: "checkmark")
-                    }
+            Toggle("Launch at Startup", isOn: Binding(
+                get: { self.launchAtStartup },
+                set: { newValue in
+                    self.launchAtStartup = newValue
+                    toggleLaunchAtStartup(enabled: newValue)
                 }
-            }
+            ))
             
             Divider()
             
@@ -125,14 +120,12 @@ struct ContentView: View {
         }
     }
     
-    func toggleLaunchAtStartup() {
+    func toggleLaunchAtStartup(enabled: Bool) {
         do {
-            if launchAtStartup {
-                try SMAppService.mainApp.unregister()
-                launchAtStartup = false
-            } else {
+            if enabled {
                 try SMAppService.mainApp.register()
-                launchAtStartup = true
+            } else {
+                try SMAppService.mainApp.unregister()
             }
         } catch {
             print("Failed to toggle launch at startup: \(error)")
