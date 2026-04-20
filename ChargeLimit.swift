@@ -10,67 +10,71 @@ struct ChargeLimitApp: App {
     }
 }
 
+struct WhiteHeaderButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.white)
+    }
+}
+
 struct ContentView: View {
     @State private var limit: Int? = nil
     @State private var bclmPath: String = ""
     @State private var errorMessage: String? = nil
-    @State private var launchAtStartup = SMAppService.mainApp.status == .enabled
+    @State private var launchAtStartup = true
     @AppStorage("isFirstLaunch") private var isFirstLaunch = true
     
     let levels = [80, 85, 90, 95, 100]
     
     var body: some View {
-        VStack {
-            HStack {
-                Text("Limit Battery Charge")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                Spacer()
-            }
-            .padding(.leading, 14)
-            .padding(.bottom, 2)
-            
-            Divider()
-            
+        Group {
             if bclmPath.isEmpty {
                 Text("Error: bclm not found")
             } else {
-                ForEach(levels, id: \.self) { level in
-                    Toggle("\(level)%", isOn: Binding(
-                        get: { self.limit == level },
-                        set: { _ in setLimit(level) }
-                    ))
+                Button(action: {}) {
+                    Text("Charge Limit")
                 }
-                
+                .buttonStyle(WhiteHeaderButtonStyle())
+                .allowsHitTesting(false)
+
+                Divider()
+
+                ForEach(levels, id: \.self) { level in
+                    Button {
+                        setLimit(level)
+                    } label: {
+                        if self.limit == level {
+                            Label("\(level)%", systemImage: "checkmark")
+                        } else {
+                            Text("\(level)%")
+                        }
+                    }
+                }
+
                 if let error = errorMessage {
-                    Divider()
                     Text("Error: \(error)")
                 }
-            }
-            
-            Divider()
-            
-            Toggle("Launch at Startup", isOn: Binding(
-                get: { self.launchAtStartup },
-                set: { newValue in
-                    self.launchAtStartup = newValue
-                    toggleLaunchAtStartup(enabled: newValue)
-                }
-            ))
-            
-            Divider()
-            
-            Button("Quit") {
-                quitApp()
+
+                Divider()
+
+                Toggle("Launch at Startup", isOn: Binding(
+                    get: { self.launchAtStartup },
+                    set: { newValue in
+                        self.launchAtStartup = newValue
+                        toggleLaunchAtStartup(enabled: newValue)
+                    }
+                ))
+
+                Divider()
+
+                Button("Quit") { quitApp() }
+                    .keyboardShortcut("q")
             }
         }
         .onAppear {
             if isFirstLaunch {
                 isFirstLaunch = false
-                if !launchAtStartup {
-                    try? SMAppService.mainApp.register()
-                    launchAtStartup = true
-                }
+                try? SMAppService.mainApp.register()
             }
             findBclm()
             fetchLimit()
