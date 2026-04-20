@@ -2,7 +2,7 @@
 
 A native macOS Menu Bar application written in SwiftUI that allows you to effortlessly cap your MacBook's battery charging level (80%, 85%, 90%, 95%, 100%) to prolong battery health.
 
-![ChargeLimit UI](screenshot.png)
+<img src="screenshot.png" width="350" alt="ChargeLimit UI">
 
 ## Features
 
