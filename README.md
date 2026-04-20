@@ -11,25 +11,18 @@ A native macOS Menu Bar application written in SwiftUI that allows you to effort
 - **Launch at Startup**: Option to automatically start the app when you log in.
 - **Auto-Reset on Quit**: Automatically restores the charge limit to 100% when you quit the app to ensure your battery can be fully charged when needed.
 - **Keyboard Shortcuts**: Quickly quit the app using `⌘Q`.
+- **Zero Dependencies**: The app comes bundled with all necessary tools (`bclm`). No Homebrew or manual installation required.
 
-## Prerequisites
+## Installation & Running
 
-This app depends on the `bclm` command-line utility to communicate with the macOS System Management Controller (SMC).
-
-You can install `bclm` via Homebrew:
-```bash
-brew tap zackelia/formulae
-brew install bclm
-```
-
-## Running the App
-
-You can just open the built `ChargeLimit.app` bundle:
-```bash
-open ChargeLimit.app
-```
+1. **Download the DMG**: Get the latest `ChargeLimit.dmg`.
+2. **Install**: Open the DMG and drag `ChargeLimit.app` to your Applications folder.
+3. **Run**: Open `ChargeLimit.app` from your Applications folder.
 
 The app runs exclusively in your Menu Bar. Click on the battery icon with the bolt to see the control panel.
+
+> [!NOTE]
+> Modifying the SMC (to set charge limits) requires administrator privileges. macOS will securely prompt you for your password or Touch ID the first time you change a limit.
 
 ## Building from source
 
@@ -38,11 +31,11 @@ To rebuild the app from source, simply run the included build script:
 chmod +x build.sh
 ./build.sh
 ```
+*Note: The build script assumes `bclm` is installed on your system to bundle it into the final app.*
 
 ## How it works
 
 - The UI is built entirely using SwiftUI and `MenuBarExtra` with the `.window` style.
-- When you select a charging level, the app executes `bclm write <value>` and `bclm persist` using `osascript`.
-- Because modifying the SMC requires administrator privileges, macOS securely prompts you for your password or Touch ID.
+- When you select a charging level, the app executes the bundled `bclm` utility using `osascript`.
 - The app uses `ServiceManagement` (`SMAppService`) to handle "Launch at Startup" functionality.
 - The `LSUIElement` key is set to `true` in `Info.plist` so the app runs cleanly without cluttering your Dock or App Switcher.

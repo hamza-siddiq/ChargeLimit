@@ -46,6 +46,16 @@ if [ -f "AppIcon.icns" ]; then
     cp AppIcon.icns ChargeLimit.app/Contents/Resources/AppIcon.icns
 fi
 
+# Bundle bclm binary for self-contained distribution
+BCLM_PATH=$(which bclm)
+if [ -f "$BCLM_PATH" ]; then
+    echo "Bundling bclm from $BCLM_PATH..."
+    cp "$BCLM_PATH" ChargeLimit.app/Contents/Resources/bclm
+    chmod +x ChargeLimit.app/Contents/Resources/bclm
+else
+    echo "Warning: bclm not found in PATH. App will require manual bclm installation."
+fi
+
 echo "Build complete! You can run the app with: open ChargeLimit.app"
 
 echo "Building DMG..."

@@ -149,6 +149,13 @@ struct ContentView: View {
     }
 
     func findBclm() {
+        // 1. Check if bundled inside the App (for self-contained DMG distribution)
+        if let bundledPath = Bundle.main.path(forResource: "bclm", ofType: nil) {
+            bclmPath = bundledPath
+            return
+        }
+
+        // 2. Fallback to common system paths
         let paths = ["/opt/homebrew/bin/bclm", "/usr/local/bin/bclm"]
         for path in paths {
             if FileManager.default.fileExists(atPath: path) {
