@@ -21,11 +21,14 @@ struct ContentView: View {
     
     var body: some View {
         VStack {
-            Button(action: {}) {
+            HStack {
                 Text("Limit Battery Charge")
                     .font(.headline)
                     .foregroundStyle(.white)
+                Spacer()
             }
+            .padding(.leading, 20)
+            .padding(.vertical, 2)
             
             Divider()
             
