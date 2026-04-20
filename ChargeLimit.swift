@@ -22,6 +22,7 @@ struct ContentView: View {
         VStack {
             Text("Limit Battery Charge")
                 .font(.headline)
+                .foregroundStyle(.white)
             
             Divider()
             
