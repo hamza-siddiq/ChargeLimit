@@ -1,5 +1,80 @@
 import SwiftUI
 import ServiceManagement
+import IOKit.ps
+import Foundation
+
+class BatteryManager: ObservableObject {
+    @Published var isSailing = false
+    @AppStorage("sailingMode") var sailingModeEnabled = false
+    @AppStorage("chargeLimit") var chargeLimit: Int = 100
+    
+    private var timer: Timer?
+    var bclmPath: String = ""
+    
+    func start() {
+        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+            self.checkBattery()
+        }
+        checkBattery()
+    }
+    
+    func checkBattery() {
+        guard !bclmPath.isEmpty else { return }
+        let level = getBatteryLevel()
+        
+        if sailingModeEnabled && chargeLimit < 100 {
+            let lowerLimit = chargeLimit - 10
+            
+            if level <= lowerLimit {
+                // Time to pick back up!
+                isSailing = false
+                setLimitSilently(chargeLimit)
+            } else if level >= chargeLimit {
+                // Reached top, start sailing (discharge down to lowerLimit)
+                isSailing = true
+                setLimitSilently(lowerLimit)
+            } else {
+                // We are in between. Enforce current state limit.
+                if isSailing {
+                    setLimitSilently(lowerLimit)
+                } else {
+                    setLimitSilently(chargeLimit)
+                }
+            }
+        } else {
+            // Standard mode
+            isSailing = false
+            setLimitSilently(chargeLimit)
+        }
+    }
+    
+    func getBatteryLevel() -> Int {
+        if let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+           let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef] {
+            for source in sources {
+                if let info = IOPSGetPowerSourceDescription(snapshot, source)?.takeUnretainedValue() as? [String: Any],
+                   let capacity = info[kIOPSCurrentCapacityKey] as? Int {
+                    return capacity
+                }
+            }
+        }
+        return 100
+    }
+    
+    func setLimitSilently(_ value: Int) {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        task.arguments = ["-n", bclmPath, "write", "\(value)"]
+        try? task.run()
+        task.waitUntilExit()
+        
+        let task2 = Process()
+        task2.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        task2.arguments = ["-n", bclmPath, "persist"]
+        try? task2.run()
+        task2.waitUntilExit()
+    }
+}
 
 @main
 struct ChargeLimitApp: App {
@@ -49,17 +124,17 @@ struct HoverHighlight: ViewModifier {
 }
 
 struct ContentView: View {
-    @State private var limit: Int? = nil
-    @State private var bclmPath: String = ""
-    @State private var errorMessage: String? = nil
-    @State private var launchAtStartup = true
+    @StateObject private var batteryManager = BatteryManager()
+    @AppStorage("launchAtStartupEnabled") private var launchAtStartup = false
     @AppStorage("isFirstLaunch") private var isFirstLaunch = true
+    @State private var errorMessage: String? = nil
+    @State private var installedHelper = false
 
     let levels = [80, 85, 90, 95, 100]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if bclmPath.isEmpty {
+            if batteryManager.bclmPath.isEmpty {
                 Text("Error: bclm not found")
                     .foregroundStyle(.white)
                     .padding(10)
@@ -82,7 +157,7 @@ struct ContentView: View {
                             Text("\(level)%")
                                 .foregroundStyle(.white)
                             Spacer()
-                            if self.limit == level {
+                            if batteryManager.chargeLimit == level {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(.white)
                             }
@@ -90,6 +165,32 @@ struct ContentView: View {
                     }
                     .buttonStyle(MenuRowButtonStyle(leadingPadding: 20))
                 }
+
+                Divider()
+                    .padding(.horizontal, 12)
+
+                Button {
+                    batteryManager.sailingModeEnabled.toggle()
+                    batteryManager.checkBattery()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Sailing Mode")
+                                .foregroundStyle(.white)
+                            Text("Picks back up at \(max(0, batteryManager.chargeLimit - 10))%")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.gray)
+                        }
+                        Spacer()
+                        if batteryManager.sailingModeEnabled {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(.white)
+                        }
+                    }
+                }
+                .buttonStyle(MenuRowButtonStyle())
+                .disabled(batteryManager.chargeLimit == 100)
+                .opacity(batteryManager.chargeLimit == 100 ? 0.5 : 1.0)
 
                 if let error = errorMessage {
                     Text("Error: \(error)")
@@ -138,77 +239,59 @@ struct ContentView: View {
         .padding(.vertical, 4)
         .frame(width: 220)
         .onAppear {
+            findBclm()
+            installHelperIfNeeded()
+            
             if isFirstLaunch {
                 isFirstLaunch = false
                 try? SMAppService.mainApp.register()
+                launchAtStartup = (SMAppService.mainApp.status == .enabled || SMAppService.mainApp.status == .notFound)
+            } else {
+                // Ensure the service is in sync with the user's preference
+                toggleLaunchAtStartup(enabled: launchAtStartup)
             }
-            launchAtStartup = SMAppService.mainApp.status == .enabled
-            findBclm()
-            fetchLimit()
+            
+            batteryManager.start()
         }
     }
 
+    func installHelperIfNeeded() {
+        guard !installedHelper else { return }
+        let path = "/private/etc/sudoers.d/chargelimit"
+        if !FileManager.default.fileExists(atPath: path) {
+            let actualBclmPath = batteryManager.bclmPath.isEmpty ? "/usr/local/bin/bclm" : batteryManager.bclmPath
+            let script = """
+            do shell script "mkdir -p /private/etc/sudoers.d && echo '%admin ALL=(ALL) NOPASSWD: \(actualBclmPath)' > \(path) && echo '%admin ALL=(ALL) NOPASSWD: /usr/local/bin/bclm' >> \(path) && echo '%admin ALL=(ALL) NOPASSWD: /opt/homebrew/bin/bclm' >> \(path) && chmod 440 \(path)" with administrator privileges
+            """
+            var errorDict: NSDictionary?
+            if let appleScript = NSAppleScript(source: script) {
+                appleScript.executeAndReturnError(&errorDict)
+            }
+        }
+        installedHelper = true
+    }
+
     func findBclm() {
-        // 1. Check if bundled inside the App (for self-contained DMG distribution)
         if let bundledPath = Bundle.main.path(forResource: "bclm", ofType: nil) {
-            bclmPath = bundledPath
+            batteryManager.bclmPath = bundledPath
             return
         }
-
-        // 2. Fallback to common system paths
         let paths = ["/opt/homebrew/bin/bclm", "/usr/local/bin/bclm"]
         for path in paths {
             if FileManager.default.fileExists(atPath: path) {
-                bclmPath = path
+                batteryManager.bclmPath = path
                 return
             }
         }
     }
 
     func fetchLimit() {
-        guard !bclmPath.isEmpty else { return }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: bclmPath)
-        process.arguments = ["read"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), let value = Int(output) {
-                self.limit = value
-                self.errorMessage = nil
-            }
-        } catch {
-            print("Failed to read limit: \(error)")
-            self.errorMessage = "Failed to read limit"
-        }
+        // Obsolete as BatteryManager tracks state via AppStorage and silent execution
     }
 
     func setLimit(_ value: Int) {
-        guard !bclmPath.isEmpty else { return }
-
-        let script = """
-        do shell script "\(bclmPath) write \(value) && \(bclmPath) persist" with administrator privileges
-        """
-
-        var errorDict: NSDictionary?
-        if let appleScript = NSAppleScript(source: script) {
-            _ = appleScript.executeAndReturnError(&errorDict)
-            if errorDict == nil {
-                self.limit = value
-                self.errorMessage = nil
-            } else {
-                if let errorString = errorDict?[NSAppleScript.errorMessage] as? String {
-                    self.errorMessage = errorString
-                } else {
-                    self.errorMessage = "Permission denied or error occurred."
-                }
-            }
-        }
+        batteryManager.chargeLimit = value
+        batteryManager.checkBattery()
     }
 
     func toggleLaunchAtStartup(enabled: Bool) {
@@ -224,8 +307,10 @@ struct ContentView: View {
     }
 
     func quitApp() {
-        if limit != 100 {
-            setLimit(100)
+        if batteryManager.chargeLimit != 100 {
+            batteryManager.chargeLimit = 100
+            batteryManager.sailingModeEnabled = false
+            batteryManager.checkBattery()
         }
         NSApplication.shared.terminate(nil)
     }

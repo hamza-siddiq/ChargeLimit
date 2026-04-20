@@ -50,6 +50,7 @@ fi
 BCLM_PATH=$(which bclm)
 if [ -f "$BCLM_PATH" ]; then
     echo "Bundling bclm from $BCLM_PATH..."
+    rm -f ChargeLimit.app/Contents/Resources/bclm
     cp "$BCLM_PATH" ChargeLimit.app/Contents/Resources/bclm
     chmod +x ChargeLimit.app/Contents/Resources/bclm
 else
