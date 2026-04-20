@@ -1,4 +1,5 @@
 import SwiftUI
+import ServiceManagement
 
 @main
 struct ChargeLimitApp: App {
@@ -13,6 +14,7 @@ struct ContentView: View {
     @State private var limit: Int? = nil
     @State private var bclmPath: String = ""
     @State private var errorMessage: String? = nil
+    @State private var launchAtStartup = SMAppService.mainApp.status == .enabled
     
     let levels = [80, 85, 90, 95, 100]
     
@@ -45,8 +47,19 @@ struct ContentView: View {
             
             Divider()
             
+            Button(action: toggleLaunchAtStartup) {
+                HStack {
+                    Text("Launch at Startup")
+                    if launchAtStartup {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+            
+            Divider()
+            
             Button("Quit") {
-                NSApplication.shared.terminate(nil)
+                quitApp()
             }
         }
         .onAppear {
@@ -111,4 +124,26 @@ struct ContentView: View {
             }
         }
     }
+    
+    func toggleLaunchAtStartup() {
+        do {
+            if launchAtStartup {
+                try SMAppService.mainApp.unregister()
+                launchAtStartup = false
+            } else {
+                try SMAppService.mainApp.register()
+                launchAtStartup = true
+            }
+        } catch {
+            print("Failed to toggle launch at startup: \(error)")
+        }
+    }
+    
+    func quitApp() {
+        if limit != 100 {
+            setLimit(100)
+        }
+        NSApplication.shared.terminate(nil)
+    }
 }
+
