@@ -142,6 +142,7 @@ struct ContentView: View {
                 isFirstLaunch = false
                 try? SMAppService.mainApp.register()
             }
+            launchAtStartup = SMAppService.mainApp.status == .enabled
             findBclm()
             fetchLimit()
         }
